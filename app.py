@@ -45,12 +45,23 @@ def handle_marketplace_notification():
 
 @app.route('/marketplace-notifications', methods=['GET'])
 def webhook_verification():
-    """Handle eBay webhook verification (if they use challenge/response)"""
-    challenge = request.args.get('challenge')
-    if challenge:
-        logger.info(f"Webhook verification challenge: {challenge}")
+    """Handle eBay webhook verification (challenge/response)"""
+    challenge = request.args.get('challenge_code')
+    verification_token = request.args.get('verification_token')
+    
+    logger.info(f"Webhook verification request:")
+    logger.info(f"Challenge: {challenge}")
+    logger.info(f"Verification token: {verification_token}")
+    
+    # The verification token should match what we set in the destination config
+    expected_token = "my-secret-verification-token-123"
+    
+    if verification_token == expected_token and challenge:
+        logger.info("✅ Verification successful - returning challenge code")
         return Response(challenge, mimetype='text/plain')
-    return "Webhook endpoint ready"
+    else:
+        logger.error("❌ Verification failed - token mismatch or missing challenge")
+        return Response("Verification failed", status=400)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
