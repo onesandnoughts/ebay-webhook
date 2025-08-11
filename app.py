@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime
 import os
+import hashlib
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -43,21 +44,30 @@ def handle_marketplace_notification():
         # Still return 200 so eBay doesn't keep retrying
         return jsonify({"status": "error", "message": str(e)}), 200
 
+import hashlib
+
 @app.route('/marketplace-notifications', methods=['GET'])
 def webhook_verification():
     """Handle eBay webhook verification (challenge/response)"""
-    # Log all parameters to see what eBay is actually sending
     logger.info(f"GET request received with args: {dict(request.args)}")
     
-    # Try different parameter names eBay might use
-    challenge = (request.args.get('challenge_code') or 
-                request.args.get('challenge') or 
-                request.args.get('code'))
+    challenge_code = request.args.get('challenge_code')
     
-    if challenge:
-        logger.info(f"✅ Challenge received: {challenge}")
-        logger.info("Returning challenge code to eBay")
-        return Response(challenge, mimetype='text/plain')
+    if challenge_code:
+        # eBay verification process requires hashing challengeCode + verificationToken + endpoint
+        verification_token = "my-secret-verification-token-123"
+        endpoint = "https://ebay-webhook-production-afe8.up.railway.app/marketplace-notifications"
+        
+        # Create SHA-256 hash as required by eBay
+        hash_input = challenge_code + verification_token + endpoint
+        challenge_response = hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+        
+        logger.info(f"✅ Challenge received: {challenge_code}")
+        logger.info(f"Hash input: {hash_input}")
+        logger.info(f"Challenge response: {challenge_response}")
+        
+        # Return JSON response as required by eBay
+        return jsonify({"challengeResponse": challenge_response})
     else:
         logger.info("No challenge parameter found - returning default message")
         return "Webhook endpoint ready"
